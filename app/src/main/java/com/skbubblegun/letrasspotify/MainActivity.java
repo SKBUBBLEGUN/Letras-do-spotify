@@ -5,6 +5,8 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.net.Uri;
+import android.provider.Settings;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -42,6 +44,7 @@ public class MainActivity extends Activity {
     private static final String API = "https://api.spotify.com/v1";
     private static final String PREF = "spotify_native";
     private static final String SCOPES = "user-read-playback-state user-modify-playback-state user-read-currently-playing";
+    private static final int OVERLAY_REQUEST = 7412;
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private final Handler main = new Handler(Looper.getMainLooper());
     private final List<Long> lyricTimes = new ArrayList<>();
@@ -156,6 +159,13 @@ public class MainActivity extends Activity {
         LinearLayout controls = new LinearLayout(this); controls.setGravity(Gravity.CENTER); controls.setPadding(0, dp(8), 0, 0);
         Button previous = button("⏮"); playButton = button("▶"); Button next = button("⏭");
         controls.addView(previous); controls.addView(playButton); controls.addView(next); root.addView(controls);
+        Button floating = button("Ativar janela flutuante");
+        floating.setTextColor(Color.WHITE);
+        floating.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.rgb(38,38,42)));
+        LinearLayout.LayoutParams floatingParams = new LinearLayout.LayoutParams(-1, -2);
+        floatingParams.topMargin = dp(10);
+        root.addView(floating, floatingParams);
+        floating.setOnClickListener(v -> enableFloatingWindow());
         previous.setOnClickListener(v -> control("/me/player/previous", "POST"));
         next.setOnClickListener(v -> control("/me/player/next", "POST"));
         playButton.setOnClickListener(v -> control(playing ? "/me/player/pause" : "/me/player/play", "PUT"));
@@ -163,8 +173,39 @@ public class MainActivity extends Activity {
         disconnect.setTextColor(Color.LTGRAY); disconnect.setBackgroundColor(Color.TRANSPARENT);
         root.addView(disconnect); disconnect.setOnClickListener(v -> {
             prefs.edit().remove("access").remove("refresh").remove("expires").apply();
+            stopService(new Intent(this, FloatingLyricsService.class));
             showHome();
         });
+    }
+
+    private void enableFloatingWindow() {
+        if (Build.VERSION.SDK_INT >= 23 && !Settings.canDrawOverlays(this)) {
+            Intent permission = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName()));
+            startActivityForResult(permission, OVERLAY_REQUEST);
+            Toast.makeText(this, "Permita que Letras do Spotify apareça sobre outros apps.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        prefs.edit().putBoolean("overlay_enabled", true).apply();
+        Intent service = new Intent(this, FloatingLyricsService.class);
+        if (Build.VERSION.SDK_INT >= 26) startForegroundService(service); else startService(service);
+        Toast.makeText(this, "Janela flutuante ativada. Arraste pela barra superior.", Toast.LENGTH_SHORT).show();
+    }
+    @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == OVERLAY_REQUEST) {
+            if (Build.VERSION.SDK_INT < 23 || Settings.canDrawOverlays(this)) enableFloatingWindow();
+            else Toast.makeText(this, "A permissão de sobreposição não foi concedida.", Toast.LENGTH_LONG).show();
+        }
+    }
+    private void broadcastOverlay(String t, String a, String l, boolean isPlaying) {
+        if (!prefs.getBoolean("overlay_enabled", false)) return;
+        Intent update = new Intent(this, FloatingLyricsService.class);
+        update.setAction(FloatingLyricsService.ACTION_UPDATE);
+        update.putExtra("title", t == null ? "" : t);
+        update.putExtra("artist", a == null ? "" : a);
+        update.putExtra("lyric", l == null ? "" : l);
+        update.putExtra("playing", isPlaying);
+        startService(update);
     }
 
     private void beginLogin() {
@@ -278,6 +319,7 @@ public class MainActivity extends Activity {
                 String artistName = by.toString();
                 main.post(() -> {
                     progressMs=p; progressAt=System.currentTimeMillis(); durationMs=d; playing=isPlaying;
+                    broadcastOverlay(name, artistName, activeLine >= 0 && activeLine < lyricTexts.size() ? lyricTexts.get(activeLine) : "♪", playing);
                     playButton.setText(playing ? "Ⅱ" : "▶");
                     duration.setText(formatTime(d)); seekBar.setProgress(d > 0 ? (int)(p*1000/d) : 0);
                     elapsed.setText(formatTime(p));
@@ -306,6 +348,7 @@ public class MainActivity extends Activity {
     }
     private void showNoTrack() {
         playing=false; progressMs=0; durationMs=0; currentTrack="";
+        broadcastOverlay("Nada tocando", "", "Abra o Spotify e reproduza uma música.", false);
         trackTitle.setText("Nada tocando"); artist.setText("");
         playButton.setText("▶"); elapsed.setText("0:00"); duration.setText("0:00"); seekBar.setProgress(0);
         setLyricsMessage("Abra o Spotify e reproduza uma música.");
@@ -381,6 +424,7 @@ public class MainActivity extends Activity {
             lyricViews.get(activeLine).setTextColor(Color.GRAY); lyricViews.get(activeLine).setScaleX(1f); lyricViews.get(activeLine).setScaleY(1f);
         }
         activeLine=index;
+        broadcastOverlay(currentTrack.isEmpty() ? "Letras do Spotify" : trackTitle.getText().toString(), artist == null ? "" : artist.getText().toString(), index >= 0 && index < lyricTexts.size() ? lyricTexts.get(index) : "♪", playing);
         if (index >= 0) {
             TextView line=lyricViews.get(index); line.setTextColor(Color.WHITE); line.setScaleX(1.02f); line.setScaleY(1.02f);
             lyricScroll.post(() -> lyricScroll.smoothScrollTo(0, Math.max(0,line.getTop()-lyricScroll.getHeight()/2)));
