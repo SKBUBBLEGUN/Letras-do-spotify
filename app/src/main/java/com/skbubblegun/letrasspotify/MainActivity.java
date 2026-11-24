@@ -85,6 +85,7 @@ public class MainActivity extends Activity {
         prefs = getSharedPreferences(PREF, MODE_PRIVATE);
         buildScreen();
         if (getIntent() != null && getIntent().getData() != null) handleCallback(getIntent().getData());
+        else if (prefs.contains("access")) showPlayer();
         else showHome();
         main.post(pollTask);
         main.post(clockTask);
