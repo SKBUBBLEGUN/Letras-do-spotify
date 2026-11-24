@@ -292,7 +292,13 @@ public class MainActivity extends Activity {
                         prefs.edit().remove("access").remove("refresh").apply(); showHome();
                         status.setText("Sessão expirada. Conecte novamente.");
                     } else if (e.getMessage() != null && e.getMessage().contains("HTTP 403")) {
-                        Toast.makeText(this, "O Spotify não permitiu consultar a reprodução. Verifique sua conta e permissões.", Toast.LENGTH_LONG).show();
+                        String detail = e.getMessage();
+                        if (detail.length() > 260) detail = detail.substring(0, 260);
+                        if (message != null) {
+                            message.setText("Erro 403 do Spotify:\n" + detail);
+                            message.setVisibility(View.VISIBLE);
+                        }
+                        Toast.makeText(this, "Erro 403: " + detail, Toast.LENGTH_LONG).show();
                     }
                 });
             }
