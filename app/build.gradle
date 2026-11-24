@@ -1,14 +1,32 @@
 plugins {
     id 'com.android.application'
 }
+
 android {
     namespace 'com.skbubblegun.letrasspotify'
     compileSdk 35
+
     defaultConfig {
         applicationId 'com.skbubblegun.letrasspotify'
         minSdk 23
         targetSdk 35
         versionCode 3
         versionName '1.2'
+    }
+
+    signingConfigs {
+        release {
+            storeFile file(System.getenv('ANDROID_KEYSTORE_PATH') ?: "${rootDir}/release-key.jks")
+            storePassword System.getenv('ANDROID_KEYSTORE_PASSWORD')
+            keyAlias System.getenv('ANDROID_KEY_ALIAS')
+            keyPassword System.getenv('ANDROID_KEY_PASSWORD')
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled false
+        }
     }
 }
