@@ -73,7 +73,7 @@ public class FloatingLyricsService extends Service {
         LinearLayout footer = new LinearLayout(this); footer.setGravity(Gravity.CENTER_VERTICAL);
         Button prev = controlButton("⏮"), pause = controlButton("Ⅱ"), next = controlButton("⏭");
         footer.addView(prev); footer.addView(pause); footer.addView(next);
-        record = new RecordView(); footer.addView(record, new LinearLayout.LayoutParams(dp(48), dp(48)));
+        record = new RecordView(this); footer.addView(record, new LinearLayout.LayoutParams(dp(48), dp(48)));
         card.addView(footer);
         prev.setOnClickListener(v -> mediaKey(android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS));
         pause.setOnClickListener(v -> mediaKey(android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE));
@@ -122,8 +122,7 @@ public class FloatingLyricsService extends Service {
         private final Handler handler = new Handler();
         private boolean spinning; private float angle;
         private final Runnable tick = new Runnable() { @Override public void run() { if (spinning) { angle=(angle+7)%360; invalidate(); handler.postDelayed(this, 35); } } };
-        RecordView() { superHolder = null; }
-        private Object superHolder;
+        RecordView(android.content.Context context) { super(context); }
         void setPlaying(boolean value) {
             if (spinning == value) return;
             spinning=value; handler.removeCallbacks(tick); if (spinning) handler.post(tick); invalidate();
