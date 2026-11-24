@@ -1,30 +1,35 @@
-# Letras do Spotify
+# Letras do Spotify — Android nativo
 
-Aplicação Android e web para exibir letras da música reproduzida no Spotify, com controles do player.
+O APK é um aplicativo Android nativo: a interface, a autenticação e a lógica ficam dentro do próprio aplicativo. **Não abre o GitHub Pages nem carrega a interface de um site.** A conexão com Spotify e LRCLIB usa internet.
 
-## Gerar e baixar o APK
+## Gerar o APK
 
 1. Abra **Actions → Build Letras do Spotify APK**.
-2. Entre na execução mais recente concluída com sucesso.
+2. Aguarde a execução terminar com status **Success**.
 3. Em **Artifacts**, baixe **Letras-do-Spotify-APK**.
-4. Extraia o ZIP e instale `app-debug.apk` no Android. Se solicitado, permita a instalação desta fonte.
+4. Extraia o ZIP e instale `app-debug.apk` no Android.
 
-O APK é uma versão Android que abre a aplicação hospedada e mantém os dados do WebView no aparelho. O login Spotify é aberto no navegador externo e retorna ao aplicativo.
-
-## Publicar a versão web (necessário para o APK)
-
-1. Abra **Settings → Pages** neste repositório.
-2. Em **Build and deployment**, escolha **Deploy from a branch**.
-3. Selecione a branch **main** e a pasta **/(root)** e salve.
-4. O endereço será `https://skbubblegun.github.io/Letras-do-spotify/`.
-
-## Configurar o Spotify
+## Configurar o Spotify (uma vez)
 
 1. Crie um aplicativo em [Spotify for Developers](https://developer.spotify.com/dashboard).
-2. Adicione como **Redirect URI** exatamente `https://skbubblegun.github.io/Letras-do-spotify/` (incluindo a barra final).
-3. Ative **Web API**, salve e copie o **Client ID**.
-4. Abra o APK, cole o Client ID e conecte sua conta Spotify.
+2. Nas configurações do app, adicione exatamente este Redirect URI: `letrasspotify://callback`.
+3. Copie o **Client ID** (não use Client Secret).
+4. Abra o APK, cole o Client ID e toque em **Conectar ao Spotify**.
+5. Autorize o acesso no Spotify. O navegador retorna ao aplicativo.
 
-O login usa Authorization Code com PKCE; Client ID e tokens ficam no armazenamento local do aplicativo. Não coloque Client Secret neste projeto.
+O login usa Authorization Code com PKCE. O Client ID e os tokens são armazenados localmente no aparelho. O APK não contém Client Secret.
 
-**Limitações:** os controles de reprodução podem exigir Spotify Premium e um dispositivo Spotify ativo. As letras são consultadas no LRCLIB e podem não existir para todas as faixas. O pop-up flutuante sobre outros aplicativos não é disponibilizado pelo wrapper Android nesta primeira versão.
+## Recursos desta versão
+
+- Interface Android nativa, sem WebView e sem dependência do GitHub Pages.
+- Consulta a música em reprodução no Spotify.
+- Busca letras sincronizadas ou simples no LRCLIB.
+- Destaque e rolagem automática da linha atual.
+- Controles de reproduzir/pausar, faixa anterior/próxima e posição da música.
+
+## Observações
+
+- É necessária conexão com a internet para Spotify e LRCLIB.
+- Os controles de reprodução podem exigir Spotify Premium e um dispositivo Spotify ativo.
+- Nem todas as músicas possuem letras no LRCLIB.
+- O acesso à Web API do Spotify depende das permissões e limites aplicáveis à sua conta e ao aplicativo cadastrado.
