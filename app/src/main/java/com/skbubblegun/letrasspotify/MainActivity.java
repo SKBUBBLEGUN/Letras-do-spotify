@@ -2,6 +2,9 @@ package com.skbubblegun.letrasspotify;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.IntentFilter;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.net.Uri;
@@ -45,6 +48,7 @@ public class MainActivity extends Activity {
     private static final String PREF = "spotify_native";
     private static final String SCOPES = "user-read-playback-state user-modify-playback-state user-read-currently-playing";
     private static final int OVERLAY_REQUEST = 7412;
+    private static final String ACTION_OVERLAY_CONTROL = "com.skbubblegun.letrasspotify.OVERLAY_CONTROL";
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private final Handler main = new Handler(Looper.getMainLooper());
     private final List<Long> lyricTimes = new ArrayList<>();
@@ -62,6 +66,14 @@ public class MainActivity extends Activity {
     private long progressMs, durationMs, progressAt;
     private boolean playing, seeking, lyricsSynced;
     private int activeLine = -1;
+    private final BroadcastReceiver overlayControlReceiver = new BroadcastReceiver() {
+        @Override public void onReceive(Context context, Intent intent) {
+            String action = intent.getStringExtra("command");
+            if ("previous".equals(action)) control("/me/player/previous", "POST");
+            else if ("next".equals(action)) control("/me/player/next", "POST");
+            else if ("toggle".equals(action)) control(playing ? "/me/player/pause" : "/me/player/play", "PUT");
+        }
+    };
 
     private final Runnable pollTask = new Runnable() {
         @Override public void run() {
@@ -76,6 +88,10 @@ public class MainActivity extends Activity {
                 seekBar.setProgress((int) (p * 1000 / durationMs));
                 elapsed.setText(formatTime(p));
                 updateLyricHighlight(p);
+                broadcastOverlay(trackTitle == null ? "" : trackTitle.getText().toString(),
+                        artist == null ? "" : artist.getText().toString(),
+                        activeLine >= 0 && activeLine < lyricTexts.size() ? lyricTexts.get(activeLine) : "♪",
+                        true, p, durationMs);
             }
             main.postDelayed(this, 400);
         }
@@ -86,6 +102,9 @@ public class MainActivity extends Activity {
         getWindow().setStatusBarColor(Color.rgb(12,12,14));
         getWindow().setNavigationBarColor(Color.rgb(12,12,14));
         prefs = getSharedPreferences(PREF, MODE_PRIVATE);
+        IntentFilter overlayFilter = new IntentFilter(ACTION_OVERLAY_CONTROL);
+        if (Build.VERSION.SDK_INT >= 33) registerReceiver(overlayControlReceiver, overlayFilter, Context.RECEIVER_NOT_EXPORTED);
+        else registerReceiver(overlayControlReceiver, overlayFilter);
         buildScreen();
         if (getIntent() != null && getIntent().getData() != null) handleCallback(getIntent().getData());
         else if (prefs.contains("access")) showPlayer();
@@ -198,6 +217,9 @@ public class MainActivity extends Activity {
         }
     }
     private void broadcastOverlay(String t, String a, String l, boolean isPlaying) {
+        broadcastOverlay(t, a, l, isPlaying, progressMs, durationMs);
+    }
+    private void broadcastOverlay(String t, String a, String l, boolean isPlaying, long position, long total) {
         if (!prefs.getBoolean("overlay_enabled", false)) return;
         Intent update = new Intent(this, FloatingLyricsService.class);
         update.setAction(FloatingLyricsService.ACTION_UPDATE);
@@ -205,7 +227,9 @@ public class MainActivity extends Activity {
         update.putExtra("artist", a == null ? "" : a);
         update.putExtra("lyric", l == null ? "" : l);
         update.putExtra("playing", isPlaying);
-        startService(update);
+        update.putExtra("position", position);
+        update.putExtra("duration", total);
+        if (Build.VERSION.SDK_INT >= 26) startForegroundService(update); else startService(update);
     }
 
     private void beginLogin() {
@@ -442,6 +466,7 @@ public class MainActivity extends Activity {
     }
     @Override protected void onDestroy() {
         main.removeCallbacks(pollTask); main.removeCallbacks(clockTask);
+        try { unregisterReceiver(overlayControlReceiver); } catch (Exception ignored) { }
         worker.shutdownNow(); super.onDestroy();
     }
 }

@@ -18,14 +18,17 @@ import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 
 public class FloatingLyricsService extends Service {
     public static final String ACTION_UPDATE = "com.skbubblegun.letrasspotify.UPDATE_OVERLAY";
+    private static final String ACTION_CONTROL = "com.skbubblegun.letrasspotify.OVERLAY_CONTROL";
     private static final String CHANNEL = "floating_lyrics";
     private WindowManager wm;
     private View panel;
-    private TextView title, artist, lyric;
+    private TextView title, artist, lyric, elapsed, duration;
+    private ProgressBar progress;
     private RecordView record;
     private boolean attached;
 
@@ -38,7 +41,8 @@ public class FloatingLyricsService extends Service {
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent != null && ACTION_UPDATE.equals(intent.getAction())) {
             updateText(intent.getStringExtra("title"), intent.getStringExtra("artist"),
-                    intent.getStringExtra("lyric"), intent.getBooleanExtra("playing", false));
+                    intent.getStringExtra("lyric"), intent.getBooleanExtra("playing", false),
+                    intent.getLongExtra("position", 0), intent.getLongExtra("duration", 0));
         }
         return START_STICKY;
     }
@@ -63,21 +67,31 @@ public class FloatingLyricsService extends Service {
         LinearLayout header = new LinearLayout(this); header.setGravity(Gravity.CENTER_VERTICAL);
         TextView handle = label("━━━━━━━━", 12, true); handle.setTextColor(Color.GRAY);
         TextView brand = label("  LETRAS DO SPOTIFY", 11, true); brand.setTextColor(Color.rgb(30,215,96));
-        Button close = new Button(this); close.setText("×"); close.setTextSize(18); close.setTextColor(Color.LTGRAY); close.setBackgroundColor(Color.TRANSPARENT);
+        Button close = controlButton("×"); close.setTextSize(19);
         header.addView(handle); header.addView(brand, new LinearLayout.LayoutParams(0, -2, 1)); header.addView(close);
         card.addView(header);
         title = label("Abra o Spotify", 14, true); title.setPadding(0, dp(4), 0, 0); card.addView(title);
         artist = label("", 11, false); artist.setTextColor(Color.LTGRAY); card.addView(artist);
         lyric = label("Aguardando música…", 20, true); lyric.setGravity(Gravity.CENTER);
-        lyric.setMinHeight(dp(82)); lyric.setPadding(dp(4), dp(8), dp(4), dp(8)); card.addView(lyric);
+        lyric.setMinHeight(dp(76)); lyric.setPadding(dp(4), dp(8), dp(4), dp(8)); card.addView(lyric);
+        progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        progress.setMax(1000);
+        card.addView(progress, new LinearLayout.LayoutParams(-1, dp(4)));
+        LinearLayout timeRow = new LinearLayout(this); timeRow.setGravity(Gravity.CENTER_VERTICAL);
+        elapsed = label("0:00", 10, false); elapsed.setTextColor(Color.LTGRAY);
+        duration = label("0:00", 10, false); duration.setTextColor(Color.LTGRAY);
+        timeRow.addView(elapsed); timeRow.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1)); timeRow.addView(duration);
+        card.addView(timeRow);
         LinearLayout footer = new LinearLayout(this); footer.setGravity(Gravity.CENTER_VERTICAL);
         Button prev = controlButton("⏮"), pause = controlButton("Ⅱ"), next = controlButton("⏭");
-        footer.addView(prev); footer.addView(pause); footer.addView(next);
+        footer.addView(prev, new LinearLayout.LayoutParams(dp(58), dp(48)));
+        footer.addView(pause, new LinearLayout.LayoutParams(dp(58), dp(48)));
+        footer.addView(next, new LinearLayout.LayoutParams(dp(58), dp(48)));
         record = new RecordView(this); footer.addView(record, new LinearLayout.LayoutParams(dp(48), dp(48)));
         card.addView(footer);
-        prev.setOnClickListener(v -> mediaKey(android.view.KeyEvent.KEYCODE_MEDIA_PREVIOUS));
-        pause.setOnClickListener(v -> mediaKey(android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE));
-        next.setOnClickListener(v -> mediaKey(android.view.KeyEvent.KEYCODE_MEDIA_NEXT));
+        prev.setOnClickListener(v -> sendControl("previous"));
+        pause.setOnClickListener(v -> sendControl("toggle"));
+        next.setOnClickListener(v -> sendControl("next"));
         close.setOnClickListener(v -> stopSelf());
         DragTouchListener drag = new DragTouchListener(); handle.setOnTouchListener(drag); brand.setOnTouchListener(drag);
         WindowManager.LayoutParams p = new WindowManager.LayoutParams(dp(310), WindowManager.LayoutParams.WRAP_CONTENT,
@@ -88,22 +102,21 @@ public class FloatingLyricsService extends Service {
         wm.addView(card, p); panel = card; attached = true;
     }
     private Button controlButton(String text) {
-        Button b = new Button(this); b.setText(text); b.setTextColor(Color.WHITE); b.setTextSize(16); b.setBackgroundColor(Color.TRANSPARENT); return b;
+        Button b = new Button(this); b.setText(text); b.setTextColor(Color.WHITE); b.setTextSize(16);
+        b.setAllCaps(false); b.setPadding(0,0,0,0); b.setBackgroundColor(Color.TRANSPARENT); return b;
     }
-    private void mediaKey(int key) {
-        long now = System.currentTimeMillis();
-        Intent down = new Intent(Intent.ACTION_MEDIA_BUTTON);
-        down.putExtra(Intent.EXTRA_KEY_EVENT, new android.view.KeyEvent(now, now, android.view.KeyEvent.ACTION_DOWN, key, 0));
-        sendBroadcast(down);
-        Intent up = new Intent(Intent.ACTION_MEDIA_BUTTON);
-        up.putExtra(Intent.EXTRA_KEY_EVENT, new android.view.KeyEvent(now, now, android.view.KeyEvent.ACTION_UP, key, 0));
-        sendBroadcast(up);
+    private void sendControl(String command) {
+        Intent i = new Intent(ACTION_CONTROL); i.setPackage(getPackageName()); i.putExtra("command", command); sendBroadcast(i);
     }
-    private void updateText(String t, String a, String l, boolean playing) {
+    private String time(long ms) { long s=Math.max(0,ms/1000); return String.format(java.util.Locale.US,"%d:%02d",s/60,s%60); }
+    private void updateText(String t, String a, String l, boolean playing, long position, long total) {
         if (!attached) createOverlay();
         if (title != null) title.setText(t == null ? "" : t);
         if (artist != null) artist.setText(a == null ? "" : a);
         if (lyric != null) lyric.setText(l == null || l.isEmpty() ? "♪" : l);
+        if (progress != null) progress.setProgress(total > 0 ? (int)Math.min(1000, Math.max(0, position * 1000 / total)) : 0);
+        if (elapsed != null) elapsed.setText(time(position));
+        if (duration != null) duration.setText(time(total));
         if (record != null) record.setPlaying(playing);
     }
     private class DragTouchListener implements View.OnTouchListener {
@@ -118,23 +131,26 @@ public class FloatingLyricsService extends Service {
         }
     }
     private static class RecordView extends View {
-        private final Paint paint = new Paint(3);
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Handler handler = new Handler();
         private boolean spinning; private float angle;
-        private final Runnable tick = new Runnable() { @Override public void run() { if (spinning) { angle=(angle+7)%360; invalidate(); handler.postDelayed(this, 35); } } };
-        RecordView(android.content.Context context) { super(context); }
+        private final Runnable tick = new Runnable() { @Override public void run() { if (spinning) { angle=(angle+10)%360; invalidate(); handler.postDelayed(this, 25); } } };
+        RecordView(android.content.Context context) { super(context); setLayerType(View.LAYER_TYPE_SOFTWARE, null); }
         void setPlaying(boolean value) {
             if (spinning == value) return;
             spinning=value; handler.removeCallbacks(tick); if (spinning) handler.post(tick); invalidate();
         }
         @Override protected void onDraw(Canvas c) {
             super.onDraw(c); float x=getWidth()/2f, y=getHeight()/2f, r=Math.min(x,y)-2;
-            c.save(); c.rotate(angle,x,y); paint.setStyle(Paint.Style.FILL); paint.setColor(Color.rgb(8,8,10)); c.drawCircle(x,y,r,paint);
-            paint.setStyle(Paint.Style.STROKE); paint.setStrokeWidth(1); paint.setColor(Color.DKGRAY);
-            for(int i=1;i<6;i++) c.drawCircle(x,y,r*i/6f,paint);
-            paint.setStyle(Paint.Style.FILL); paint.setColor(Color.rgb(30,215,96)); c.drawCircle(x,y,r*.22f,paint);
-            paint.setColor(Color.BLACK); c.drawCircle(x,y,r*.06f,paint); c.restore();
+            c.save(); c.rotate(angle,x,y);
+            paint.setStyle(Paint.Style.FILL); paint.setColor(Color.rgb(5,5,7)); c.drawCircle(x,y,r,paint);
+            paint.setStyle(Paint.Style.STROKE); paint.setStrokeWidth(dpStatic(getContext(),1.2f)); paint.setColor(Color.rgb(75,75,82));
+            for(int i=1;i<7;i++) c.drawCircle(x,y,r*i/7f,paint);
+            paint.setStyle(Paint.Style.FILL); paint.setColor(Color.rgb(30,215,96)); c.drawCircle(x,y,r*.25f,paint);
+            paint.setColor(Color.WHITE); c.drawCircle(x,y,r*.055f,paint);
+            c.restore();
         }
+        private static float dpStatic(android.content.Context c,float n) { return n*c.getResources().getDisplayMetrics().density; }
     }
     @Override public void onDestroy() {
         getSharedPreferences("spotify_native", MODE_PRIVATE).edit().putBoolean("overlay_enabled", false).apply();
