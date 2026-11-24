@@ -106,6 +106,16 @@ body.popup .popbtn,body.popup .logout{display:none}
   .toast{bottom:calc(132px + env(safe-area-inset-bottom))}
 }
 </style>
+<script>
+/* Retorna o OAuth do navegador ao aplicativo Android instalado. */
+(function () {
+  const isAndroidBrowser = /Android/i.test(navigator.userAgent) && !/LetrasAndroidApp/i.test(navigator.userAgent);
+  const params = new URLSearchParams(location.search);
+  if (isAndroidBrowser && (params.has('code') || params.has('error'))) {
+    location.replace('letrasspotify://callback' + location.search);
+  }
+})();
+</script>
 </head>
 <body>
 
