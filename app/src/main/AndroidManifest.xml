@@ -5,8 +5,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <application
-        android:icon="@drawable/ic_launcher"
-        android:roundIcon="@drawable/ic_launcher"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
         android:allowBackup="false"
         android:label="Letras do Spotify"
         android:theme="@android:style/Theme.Material.NoActionBar"
