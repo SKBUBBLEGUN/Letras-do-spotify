@@ -127,7 +127,8 @@ public class MainActivity extends Activity {
     }
     private void buildScreen() {
         root = new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(20), dp(26), dp(20), dp(16)); root.setBackgroundColor(Color.rgb(12,12,14));
+        root.setPadding(dp(18), dp(18), dp(18), dp(14));
+        root.setGravity(Gravity.CENTER_HORIZONTAL); root.setBackgroundColor(Color.rgb(12,12,14));
         setContentView(root);
     }
     private void showHome() {
@@ -153,8 +154,9 @@ public class MainActivity extends Activity {
         TextView heading = text("LETRAS", 13, true); heading.setTextColor(Color.rgb(30,215,96));
         root.addView(heading);
         trackTitle = text("Nada tocando", 22, true);
-        trackTitle.setPadding(0, dp(12), 0, dp(2)); root.addView(trackTitle);
-        artist = text("", 14, false); artist.setTextColor(Color.LTGRAY); root.addView(artist);
+        trackTitle.setGravity(Gravity.CENTER);
+        trackTitle.setPadding(0, dp(10), 0, dp(2)); root.addView(trackTitle);
+        artist = text("", 14, false); artist.setGravity(Gravity.CENTER); artist.setTextColor(Color.LTGRAY); root.addView(artist);
         message = text("Abra o Spotify e reproduza uma música.", 15, false);
         message.setGravity(Gravity.CENTER); message.setTextColor(Color.LTGRAY);
         root.addView(message, new LinearLayout.LayoutParams(-1, dp(72)));
@@ -423,8 +425,9 @@ public class MainActivity extends Activity {
             lyricTimes.clear(); lyricTimes.addAll(ft); lyricTexts.clear(); lyricTexts.addAll(fl);
             lyricsSynced=synced; lyricColumn.removeAllViews(); lyricViews.clear(); activeLine=-1;
             for (String line : fl) {
-                TextView t=text(line.isEmpty() ? "♪" : line, synced ? 24 : 18, true);
-                t.setTextColor(synced ? Color.GRAY : Color.WHITE); t.setPadding(0,dp(10),0,dp(10));
+                TextView t=text(line.isEmpty() ? "♪" : line, synced ? 21 : 17, true);
+                t.setGravity(Gravity.CENTER);
+                t.setTextColor(synced ? Color.GRAY : Color.WHITE); t.setPadding(dp(4),dp(8),dp(4),dp(8));
                 lyricColumn.addView(t); lyricViews.add(t);
             }
             message.setVisibility(View.GONE);
