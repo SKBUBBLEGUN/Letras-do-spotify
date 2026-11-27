@@ -1,0 +1,32 @@
+name: Package editable source project
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/package-source.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create source ZIP
+        run: |
+          zip -r Letras-do-Spotify-Codigo-Fonte.zip . \
+            -x '.git/*' \
+            -x 'app/build/*' \
+            -x '.gradle/*' \
+            -x '*/build/*' \
+            -x 'release-key.jks'
+          test -s Letras-do-Spotify-Codigo-Fonte.zip
+      - name: Upload source project
+        uses: actions/upload-artifact@v4
+        with:
+          name: Letras-do-Spotify-Codigo-Fonte
+          path: Letras-do-Spotify-Codigo-Fonte.zip
+          if-no-files-found: error
