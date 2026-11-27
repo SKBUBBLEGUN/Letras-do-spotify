@@ -29,6 +29,7 @@ public class FloatingLyricsService extends Service {
     private View panel;
     private TextView title, artist, lyric, elapsed, duration;
     private ProgressBar progress;
+    private Button playPause;
     private RecordView record;
     private boolean attached;
 
@@ -74,26 +75,31 @@ public class FloatingLyricsService extends Service {
         artist = label("", 11, false); artist.setTextColor(Color.LTGRAY); card.addView(artist);
         lyric = label("Aguardando música…", 20, true); lyric.setGravity(Gravity.CENTER);
         lyric.setMinHeight(dp(76)); lyric.setPadding(dp(4), dp(8), dp(4), dp(8)); card.addView(lyric);
-        progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
-        progress.setMax(1000);
-        card.addView(progress, new LinearLayout.LayoutParams(-1, dp(4)));
         LinearLayout timeRow = new LinearLayout(this); timeRow.setGravity(Gravity.CENTER_VERTICAL);
         elapsed = label("0:00", 10, false); elapsed.setTextColor(Color.LTGRAY);
         duration = label("0:00", 10, false); duration.setTextColor(Color.LTGRAY);
         timeRow.addView(elapsed); timeRow.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1)); timeRow.addView(duration);
         card.addView(timeRow);
+        progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        progress.setMax(1000);
+        if (Build.VERSION.SDK_INT >= 21) progress.setProgressTintList(android.content.res.ColorStateList.valueOf(Color.rgb(30,215,96)));
+        LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(-1, dp(4));
+        progressParams.bottomMargin = dp(5);
+        card.addView(progress, progressParams);
         LinearLayout footer = new LinearLayout(this); footer.setGravity(Gravity.CENTER_VERTICAL);
-        Button prev = controlButton("⏮"), pause = controlButton("Ⅱ"), next = controlButton("⏭");
+        Button prev = controlButton("⏮"), next = controlButton("⏭");
+        playPause = controlButton("Ⅱ");
         footer.addView(prev, new LinearLayout.LayoutParams(dp(58), dp(48)));
-        footer.addView(pause, new LinearLayout.LayoutParams(dp(58), dp(48)));
+        footer.addView(playPause, new LinearLayout.LayoutParams(dp(58), dp(48)));
         footer.addView(next, new LinearLayout.LayoutParams(dp(58), dp(48)));
         record = new RecordView(this); footer.addView(record, new LinearLayout.LayoutParams(dp(48), dp(48)));
         card.addView(footer);
         prev.setOnClickListener(v -> sendControl("previous"));
-        pause.setOnClickListener(v -> sendControl("toggle"));
+        playPause.setOnClickListener(v -> sendControl("toggle"));
         next.setOnClickListener(v -> sendControl("next"));
         close.setOnClickListener(v -> stopSelf());
-        DragTouchListener drag = new DragTouchListener(); handle.setOnTouchListener(drag); brand.setOnTouchListener(drag);
+        DragTouchListener drag = new DragTouchListener();
+        card.setOnTouchListener(drag);
         WindowManager.LayoutParams p = new WindowManager.LayoutParams(dp(310), WindowManager.LayoutParams.WRAP_CONTENT,
                 Build.VERSION.SDK_INT >= 26 ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY : WindowManager.LayoutParams.TYPE_PHONE,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
@@ -118,6 +124,7 @@ public class FloatingLyricsService extends Service {
         if (elapsed != null) elapsed.setText(time(position));
         if (duration != null) duration.setText(time(total));
         if (record != null) record.setPlaying(playing);
+        if (playPause != null) playPause.setText(playing ? "Ⅱ" : "▶");
     }
     private class DragTouchListener implements View.OnTouchListener {
         int x, y; float tx, ty;
