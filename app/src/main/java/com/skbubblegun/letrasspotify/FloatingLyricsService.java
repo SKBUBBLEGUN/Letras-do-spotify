@@ -113,6 +113,12 @@ public class FloatingLyricsService extends Service {
         close.setOnClickListener(v -> stopSelf());
         DragTouchListener drag = new DragTouchListener();
         card.setOnTouchListener(drag);
+        header.setOnTouchListener(drag);
+        title.setOnTouchListener(drag);
+        artist.setOnTouchListener(drag);
+        lyric.setOnTouchListener(drag);
+        timeRow.setOnTouchListener(drag);
+        progress.setOnTouchListener(drag);
         WindowManager.LayoutParams p = new WindowManager.LayoutParams(dp(310), WindowManager.LayoutParams.WRAP_CONTENT,
                 Build.VERSION.SDK_INT >= 26 ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY : WindowManager.LayoutParams.TYPE_PHONE,
                 WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
