@@ -153,7 +153,7 @@ public class MainActivity extends Activity {
         root.removeAllViews();
         TextView heading = text("LETRAS", 13, true); heading.setTextColor(Color.rgb(30,215,96));
         root.addView(heading);
-        trackTitle = text("Nada tocando", 22, true);
+        trackTitle = text("Nada tocando", 20, true);
         trackTitle.setGravity(Gravity.CENTER);
         trackTitle.setPadding(0, dp(10), 0, dp(2)); root.addView(trackTitle);
         artist = text("", 14, false); artist.setGravity(Gravity.CENTER); artist.setTextColor(Color.LTGRAY); root.addView(artist);
@@ -209,7 +209,7 @@ public class MainActivity extends Activity {
         prefs.edit().putBoolean("overlay_enabled", true).apply();
         Intent service = new Intent(this, FloatingLyricsService.class);
         if (Build.VERSION.SDK_INT >= 26) startForegroundService(service); else startService(service);
-        Toast.makeText(this, "Janela flutuante ativada. Arraste pela barra superior.", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "Janela flutuante ativada. Segure uma área livre para mover.", Toast.LENGTH_SHORT).show();
     }
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
@@ -425,9 +425,9 @@ public class MainActivity extends Activity {
             lyricTimes.clear(); lyricTimes.addAll(ft); lyricTexts.clear(); lyricTexts.addAll(fl);
             lyricsSynced=synced; lyricColumn.removeAllViews(); lyricViews.clear(); activeLine=-1;
             for (String line : fl) {
-                TextView t=text(line.isEmpty() ? "♪" : line, synced ? 21 : 17, true);
+                TextView t=text(line.isEmpty() ? "♪" : line, synced ? 19 : 16, true);
                 t.setGravity(Gravity.CENTER);
-                t.setTextColor(synced ? Color.GRAY : Color.WHITE); t.setPadding(dp(4),dp(8),dp(4),dp(8));
+                t.setTextColor(synced ? Color.GRAY : Color.WHITE); t.setPadding(dp(6),dp(6),dp(6),dp(6));
                 lyricColumn.addView(t); lyricViews.add(t);
             }
             message.setVisibility(View.GONE);
