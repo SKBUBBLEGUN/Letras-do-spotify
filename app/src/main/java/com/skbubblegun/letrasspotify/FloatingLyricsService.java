@@ -217,7 +217,7 @@ public class FloatingLyricsService extends Service {
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final Handler handler = new Handler();
         private boolean spinning; private float angle;
-        private final Runnable tick = new Runnable() { @Override public void run() { if (spinning) { angle=(angle+8)%360; invalidate(); handler.postDelayed(this, 30); } } };
+        private final Runnable tick = new Runnable() { @Override public void run() { if (spinning) { angle=(angle+14)%360; invalidate(); handler.postDelayed(this, 25); } } };
         RecordView(android.content.Context context) { super(context); setLayerType(View.LAYER_TYPE_SOFTWARE, null); }
         void setPlaying(boolean value) {
             if (spinning == value) return;
