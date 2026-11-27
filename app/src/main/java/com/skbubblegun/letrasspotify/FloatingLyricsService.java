@@ -21,6 +21,17 @@ import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
+import org.json.JSONObject;
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLEncoder;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 public class FloatingLyricsService extends Service {
     public static final String ACTION_UPDATE = "com.skbubblegun.letrasspotify.UPDATE_OVERLAY";
     private static final String ACTION_CONTROL = "com.skbubblegun.letrasspotify.OVERLAY_CONTROL";
@@ -32,6 +43,8 @@ public class FloatingLyricsService extends Service {
     private Button playPause;
     private RecordView record;
     private boolean attached;
+    private boolean lastPlaying;
+    private final ExecutorService controlWorker = Executors.newSingleThreadExecutor();
 
     @Override public void onCreate() {
         super.onCreate();
@@ -112,7 +125,63 @@ public class FloatingLyricsService extends Service {
         b.setAllCaps(false); b.setPadding(0,0,0,0); b.setBackgroundColor(Color.TRANSPARENT); return b;
     }
     private void sendControl(String command) {
-        Intent i = new Intent(ACTION_CONTROL); i.setPackage(getPackageName()); i.putExtra("command", command); sendBroadcast(i);
+        controlWorker.execute(() -> {
+            HttpURLConnection connection = null;
+            try {
+                android.content.SharedPreferences prefs = getSharedPreferences("spotify_native", MODE_PRIVATE);
+                String token = prefs.getString("access", null);
+                if (token == null) throw new Exception("Abra o aplicativo e conecte ao Spotify novamente.");
+                if (System.currentTimeMillis() >= prefs.getLong("expires", 0)) {
+                    String refresh = prefs.getString("refresh", null);
+                    if (refresh == null) throw new Exception("Sessão expirada. Conecte novamente.");
+                    String body = "grant_type=refresh_token&refresh_token=" + URLEncoder.encode(refresh, "UTF-8")
+                            + "&client_id=" + URLEncoder.encode(prefs.getString("client_id", ""), "UTF-8");
+                    HttpURLConnection refreshConnection = (HttpURLConnection)new URL("https://accounts.spotify.com/api/token").openConnection();
+                    refreshConnection.setRequestMethod("POST");
+                    refreshConnection.setConnectTimeout(15000); refreshConnection.setReadTimeout(15000);
+                    refreshConnection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+                    refreshConnection.setDoOutput(true);
+                    try (OutputStream out = refreshConnection.getOutputStream()) { out.write(body.getBytes("UTF-8")); }
+                    int refreshCode = refreshConnection.getResponseCode();
+                    InputStream refreshStream = refreshCode >= 200 && refreshCode < 300 ? refreshConnection.getInputStream() : refreshConnection.getErrorStream();
+                    StringBuilder refreshJson = new StringBuilder();
+                    if (refreshStream != null) try (BufferedReader reader = new BufferedReader(new InputStreamReader(refreshStream, "UTF-8"))) {
+                        String line; while ((line = reader.readLine()) != null) refreshJson.append(line);
+                    }
+                    refreshConnection.disconnect();
+                    if (refreshCode < 200 || refreshCode >= 300) throw new Exception("Falha ao renovar a sessão (HTTP " + refreshCode + ").");
+                    JSONObject refreshed = new JSONObject(refreshJson.toString());
+                    token = refreshed.getString("access_token");
+                    android.content.SharedPreferences.Editor edit = prefs.edit().putString("access", token)
+                            .putLong("expires", System.currentTimeMillis() + refreshed.optLong("expires_in", 3600) * 1000L - 30000);
+                    if (refreshed.has("refresh_token")) edit.putString("refresh", refreshed.getString("refresh_token"));
+                    edit.apply();
+                }
+                String endpoint, method;
+                if ("previous".equals(command)) { endpoint = "/me/player/previous"; method = "POST"; }
+                else if ("next".equals(command)) { endpoint = "/me/player/next"; method = "POST"; }
+                else { endpoint = lastPlaying ? "/me/player/pause" : "/me/player/play"; method = "PUT"; }
+                connection = (HttpURLConnection)new URL("https://api.spotify.com/v1" + endpoint).openConnection();
+                connection.setRequestMethod(method);
+                connection.setConnectTimeout(15000); connection.setReadTimeout(15000);
+                connection.setRequestProperty("Authorization", "Bearer " + token);
+                int code = connection.getResponseCode();
+                if (code < 200 || code >= 300) {
+                    InputStream error = connection.getErrorStream();
+                    StringBuilder detail = new StringBuilder();
+                    if (error != null) try (BufferedReader reader = new BufferedReader(new InputStreamReader(error, "UTF-8"))) {
+                        String line; while ((line = reader.readLine()) != null) detail.append(line);
+                    }
+                    throw new Exception("Spotify HTTP " + code + (detail.length() > 0 ? ": " + detail : ""));
+                }
+                if ("toggle".equals(command)) lastPlaying = !lastPlaying;
+            } catch (Exception error) {
+                String message = error.getMessage() == null ? "Não foi possível controlar a reprodução." : error.getMessage();
+                new Handler(getMainLooper()).post(() -> android.widget.Toast.makeText(this, message, android.widget.Toast.LENGTH_LONG).show());
+            } finally {
+                if (connection != null) connection.disconnect();
+            }
+        });
     }
     private String time(long ms) { long s=Math.max(0,ms/1000); return String.format(java.util.Locale.US,"%d:%02d",s/60,s%60); }
     private void updateText(String t, String a, String l, boolean playing, long position, long total) {
@@ -123,6 +192,7 @@ public class FloatingLyricsService extends Service {
         if (progress != null) progress.setProgress(total > 0 ? (int)Math.min(1000, Math.max(0, position * 1000 / total)) : 0);
         if (elapsed != null) elapsed.setText(time(position));
         if (duration != null) duration.setText(time(total));
+        lastPlaying = playing;
         if (record != null) record.setPlaying(playing);
         if (playPause != null) playPause.setText(playing ? "Ⅱ" : "▶");
     }
@@ -163,6 +233,7 @@ public class FloatingLyricsService extends Service {
         getSharedPreferences("spotify_native", MODE_PRIVATE).edit().putBoolean("overlay_enabled", false).apply();
         if (record != null) record.setPlaying(false);
         if (attached && wm != null) { wm.removeView(panel); attached=false; }
+        controlWorker.shutdownNow();
         stopForeground(true); super.onDestroy();
     }
     @Override public IBinder onBind(Intent intent) { return null; }
